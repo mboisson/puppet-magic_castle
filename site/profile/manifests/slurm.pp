@@ -643,10 +643,7 @@ class profile::slurm::node {
     source_pp => 'puppet:///modules/profile/slurm/slurmd.pp',
   }
 
-  file { '/localscratch':
-    ensure  => 'directory',
-    seltype => 'tmp_t'
-  }
+  ensure_resource('file', '/localscratch', { 'ensure' => 'directory', 'seltype' => 'tmp_t' })
 
   file { '/var/spool/slurmd':
     ensure => 'directory',
