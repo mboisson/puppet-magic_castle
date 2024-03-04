@@ -9,7 +9,7 @@
 class profile::slurm::base (
   String $cluster_name,
   String $munge_key,
-  Enum['20.11', '21.08', '22.05', '23.02'] $slurm_version,
+  Enum['23.02'] $slurm_version,
   Integer $os_reserved_memory,
   Integer $suspend_time = 3600,
   Integer $resume_timeout = 3600,
@@ -143,7 +143,7 @@ class profile::slurm::base (
     require   => Package['munge']
   }
 
-  $yumrepo_prefix = "https://download.copr.fedorainfracloud.org/results/cmdntrf/Slurm${slurm_version}/"
+  $yumrepo_prefix = "https://download.copr.fedorainfracloud.org/results/cmdntrf/Slurm${slurm_version}-nvml"
   yumrepo { 'slurm-copr-repo':
     enabled             => true,
     descr               => "Copr repo for Slurm${slurm_version} owned by cmdntrf",
@@ -255,18 +255,6 @@ class profile::slurm::base (
         'memlimit' => $os_reserved_memory,
         'weights'  => slurm_compute_weights($nodes),
       }),
-  }
-
-  file { '/etc/slurm/gres.conf':
-    ensure  => 'present',
-    owner   => 'slurm',
-    group   => 'slurm',
-    content => epp('profile/slurm/gres.conf',
-      {
-        'nodes' => $nodes,
-      }
-    ),
-    seltype => 'etc_t'
   }
 
   file { '/opt/software/slurm/bin/cond_restart_slurm_services':
@@ -423,6 +411,20 @@ class profile::slurm::controller (
 ) {
   contain profile::slurm::base
   include profile::mail::server
+
+  $instances = lookup('terraform.instances')
+  $nodes = $instances.filter|$key, $attr| { 'node' in $attr['tags'] }
+  file { '/etc/slurm/gres.conf':
+    ensure  => 'present',
+    owner   => 'slurm',
+    group   => 'slurm',
+    content => epp('profile/slurm/gres.conf',
+      {
+        'nodes' => $nodes,
+      }
+    ),
+    seltype => 'etc_t'
+  }
 
   file { '/usr/sbin/slurm_mail':
     ensure => 'present',
@@ -654,9 +656,20 @@ class profile::slurm::node {
     group  => 'slurm'
   }
 
+  if $facts['nvidia_gpu_count'] > 0 {
+    file { '/etc/slurm/gres.conf':
+      notify  => Service['slurmd'],
+      seltype => 'etc_t',
+      content => @(EOT)
+        AutoDetect=nvml
+        |EOT
+    }
+  }
+
   Exec <| tag == profile::cvmfs |> -> Service['slurmd']
   Exec <| tag == profile::freeipa |> -> Service['slurmd']
   Exec <| tag == profile::gpu |> -> Service['slurmd']
+  Exec <| tag == profile::gpu::install::mig |> ~> Service['slurmd']
   Exec <| tag == profile::jupyterhub |> -> Service['slurmd']
   Kmod::Load <| |> -> Service['slurmd']
   Mount <| |> -> Service['slurmd']
@@ -671,14 +684,13 @@ class profile::slurm::node {
 
   service { 'slurmd':
     ensure    => 'running',
-    enable    => true,
+    enable    => false,
     subscribe => [
       File['/etc/slurm/cgroup.conf'],
       File['/etc/slurm/plugstack.conf'],
       File['/etc/slurm/slurm.conf'],
       File['/etc/slurm/slurm-addendum.conf'],
       File['/etc/slurm/nodes.conf'],
-      File['/etc/slurm/gres.conf'],
     ],
     require   => [
       Package['slurm-slurmd'],

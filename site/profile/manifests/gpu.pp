@@ -81,7 +81,9 @@ class profile::gpu::install (
   }
 }
 
-class profile::gpu::install::passthrough (Array[String] $packages) {
+class profile::gpu::install::passthrough (
+  Array[String] $packages,
+) {
   $os = "rhel${::facts['os']['release']['major']}"
   $arch = $::facts['os']['architecture']
   if versioncmp($::facts['os']['release']['major'], '8') >= 0 {
@@ -94,6 +96,28 @@ class profile::gpu::install::passthrough (Array[String] $packages) {
     command => "${repo_config_cmd} --add-repo http://developer.download.nvidia.com/compute/cuda/repos/${os}/${arch}/cuda-${os}.repo",
     creates => "/etc/yum.repos.d/cuda-${os}.repo",
     path    => ['/usr/bin'],
+  }
+
+  $mig_profile = lookup("terraform.instances.${facts['networking']['hostname']}.specs.mig")
+  if $mig_profile and !$mig_profile.empty {
+    include profile::gpu::install::mig
+  }
+  else {
+    exec {'disable_mig':
+      command     => 'nvidia-mig-parted apply',
+      onlyif      => ['nvidia-mig-parted assert ; test $? -eq 1'],
+      environment => [
+        'MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/config.yaml',
+        'MIG_PARTED_HOOKS_FILE=/etc/nvidia-mig-manager/puppet-hooks.yaml',
+        'MIG_PARTED_SELECTED_CONFIG=all-disabled',
+        'MIG_PARTED_SKIP_RESET=false',
+      ],
+      path        => ['/usr/bin'],
+      notify      => [
+        Service['nvidia-persistenced'],
+        Service['nvidia-dcgm'],
+      ]
+    }
   }
 
   package { $packages:
@@ -128,6 +152,83 @@ class profile::gpu::install::passthrough (Array[String] $packages) {
     content => 'd /run/nvidia-persistenced 0755 nvidia-persistenced nvidia-persistenced -',
     mode    => '0644',
   }
+}
+
+class profile::gpu::install::mig (
+  String $mig_manager_version = '0.5.5',
+) {
+  $mig_profile = lookup("terraform.instances.${facts['networking']['hostname']}.specs.mig")
+  $arch = $::facts['os']['architecture']
+
+  package { 'nvidia-mig-manager':
+    ensure   => 'latest',
+    provider => 'rpm',
+    name     => 'nvidia-mig-manager',
+    source   => "https://github.com/NVIDIA/mig-parted/releases/download/v${$mig_manager_version}/nvidia-mig-manager-${mig_manager_version}-1.${arch}.rpm",
+  }
+
+  service { 'nvidia-mig-manager':
+    ensure  => stopped,
+    enable  => false,
+    require => Package['nvidia-mig-manager'],
+  }
+
+  file { '/etc/nvidia-mig-manager/puppet-config.yaml':
+    require => Package['nvidia-mig-manager'],
+    content => @("EOT")
+      version: v1
+      mig-configs:
+        default:
+          - devices: all
+            mig-enabled: true
+            mig-devices: ${to_json($mig_profile)}
+      |EOT
+  }
+
+  file_line { 'nvidia-persistenced.service':
+    ensure  => present,
+    path    => '/etc/nvidia-mig-manager/hooks.sh',
+    after   => 'driver_services=\(',
+    line    => '        nvidia-persistenced.service',
+    require => Package['nvidia-mig-manager'],
+  }
+
+  file { '/etc/nvidia-mig-manager/puppet-hooks.yaml':
+    require => Package['nvidia-mig-manager'],
+    content => @("EOT")
+      version: v1
+      hooks:
+        pre-apply-mode:
+        - workdir: "/etc/nvidia-mig-manager"
+          command: "/bin/bash"
+          args: ["-x", "-c", "source hooks.sh; stop_driver_services"]
+        - workdir: "/etc/nvidia-mig-manager"
+          command: "/bin/sh"
+          args: ["-c", "systemctl -q is-active slurmd && systemctl stop slurmd || true"]
+      |EOT
+  }
+
+  exec { 'nvidia-mig-parted apply':
+    unless      => 'nvidia-mig-parted assert',
+    require     => [
+      Package['nvidia-mig-manager'],
+      File['/etc/nvidia-mig-manager/puppet-config.yaml'],
+      File['/etc/nvidia-mig-manager/puppet-hooks.yaml'],
+    ],
+    environment => [
+      'MIG_PARTED_CONFIG_FILE=/etc/nvidia-mig-manager/puppet-config.yaml',
+      'MIG_PARTED_HOOKS_FILE=/etc/nvidia-mig-manager/puppet-hooks.yaml',
+      'MIG_PARTED_SELECTED_CONFIG=default',
+      'MIG_PARTED_SKIP_RESET=false',
+    ],
+    path        => ['/usr/bin'],
+    notify      => [
+      Service['nvidia-persistenced'],
+      Service['nvidia-dcgm'],
+    ],
+  }
+
+  Package <| tag == profile::gpu::install::passthrough |> -> Exec['nvidia-mig-parted apply']
 }
 
 class profile::gpu::install::vgpu (
