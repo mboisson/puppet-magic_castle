@@ -9,7 +9,7 @@
 class profile::slurm::base (
   String $cluster_name,
   String $munge_key,
-  Enum['23.02'] $slurm_version,
+  Enum['21.08', '22.05', '23.02'] $slurm_version,
   Integer $os_reserved_memory,
   Integer $suspend_time = 3600,
   Integer $resume_timeout = 3600,
@@ -143,7 +143,7 @@ class profile::slurm::base (
     require   => Package['munge']
   }
 
-  $yumrepo_prefix = "https://download.copr.fedorainfracloud.org/results/cmdntrf/Slurm${slurm_version}-nvml"
+  $yumrepo_prefix = "https://download.copr.fedorainfracloud.org/results/cmdntrf/Slurm${slurm_version}"
   yumrepo { 'slurm-copr-repo':
     enabled             => true,
     descr               => "Copr repo for Slurm${slurm_version} owned by cmdntrf",
@@ -656,14 +656,28 @@ class profile::slurm::node {
     group  => 'slurm'
   }
 
+  file { '/opt/software/slurm/bin/nvidia_gres.sh':
+    source  => 'puppet:///modules/profile/slurm/nvidia_gres.sh',
+    mode    => '0755',
+    require => Package['slurm'],
+  }
+
   if $facts['nvidia_gpu_count'] > 0 {
     file { '/etc/slurm/gres.conf':
-      notify  => Service['slurmd'],
-      seltype => 'etc_t',
-      content => @(EOT)
-        AutoDetect=nvml
-        |EOT
+      ensure => present,
     }
+    exec { 'slurm-nvidia_gres':
+      command     => '/opt/software/slurm/bin/nvidia_gres.sh > /etc/slurm/gres.conf',
+      refreshonly => true,
+      notify      => Service['slurmd'],
+      subscribe   => [
+        File['/opt/software/slurm/bin/nvidia_gres.sh'],
+        File['/etc/slurm/gres.conf'],
+      ]
+    }
+    Kmod::Load <| tag == profile::gpu  |> -> Exec['slurm-nvidia_gres']
+    Exec <| tag == profile::gpu |> ~> Exec['slurm-nvidia_gres']
+    Exec <| tag == profile::gpu::install::mig |> ~> Exec['slurm-nvidia_gres']
   }
 
   Exec <| tag == profile::cvmfs |> -> Service['slurmd']
