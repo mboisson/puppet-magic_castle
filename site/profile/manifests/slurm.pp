@@ -561,8 +561,9 @@ export TFE_VAR_POOL=${tfe_var_pool}
 }
 
 # Slurm node class. This is where slurmd is ran.
-class profile::slurm::node 
+class profile::slurm::node (
   Boolean $enable_tmpfs_mounts = true,
+)
 {
   contain profile::slurm::base
 
