@@ -26,6 +26,7 @@ type PublisherConfiguration = Struct[
     'certificate' => String,
     'public_key' => String,
     'api_key' => String,
+    'server_conf' => Optional[Array[Tuple[String, String]]]
   }
 ]
 
@@ -54,30 +55,53 @@ define profile::cvmfs::publisher::repository (
   String $gateway_url,
   String $certificate,
   String $public_key,
-  String $api_key
+  String $api_key,
+  Optional[Array[Tuple[String, String]]] $server_conf = undef,
 ) {
   file { "/etc/cvmfs/keys/${repository_name}.crt":
     content => $certificate,
-    mode    => '0644',
+    mode    => '0444',
     owner   => $repository_user,
     group   => 'root',
   }
   file { "/etc/cvmfs/keys/${repository_name}.pub":
     content => $public_key,
-    mode    => '0644',
+    mode    => '0444',
     owner   => $repository_user,
     group   => 'root',
   }
   file { "/etc/cvmfs/keys/${repository_name}.gw":
     content => $api_key,
-    mode    => '0600',
+    mode    => '0400',
     owner   => $repository_user,
     group   => 'root',
   }
+  exec { "mkfs_${repository_name}":
+    command => "cvmfs_server mkfs -w ${stratum0_url} -u gw,/srv/cvmfs/${repository_name}/data/txn,${gateway_url} -k /etc/cvmfs/keys -o ${repository_user} -a shake128 ${repository_name}",
+    require => [File["/etc/cvmfs/keys/${repository_name}.crt"], File["/etc/cvmfs/keys/${repository_name}.pub"], File["/etc/cvmfs/keys/${repository_name}.gw"]],
+    path    => ['/usr/bin'],
+    returns => [0],
+    # create only if it does not already exist
+    creates => ["/var/spool/cvmfs/${repository_name}"]
+  }
+
+  if ($server_conf) {
+    $server_conf.each | Integer $index, Tuple[String, String] $kv | {
+      file_line { "server.conf_${repository_name}_${kv[0]}":
+        ensure  => 'present',
+        path    => "/etc/cvmfs/repositories.d/${repository_name}/server.conf",
+        line    => "${kv[0]}=${kv[1]}",
+        match   => "^${kv[0]}=.*",
+        require => Exec["mkfs_${repository_name}"]
+      }
+    }
+  }
 }
+
 
 class profile::cvmfs::client (
   Integer $quota_limit,
+  Boolean $strict_mount = false,
   Array[String] $repositories,
   Array[String] $alien_cache_repositories = [],
 ) {
@@ -104,6 +128,7 @@ class profile::cvmfs::client (
 
   file { '/etc/cvmfs/default.local.ctmpl':
     content => epp('profile/cvmfs/default.local', {
+        'strict_mount' => $strict_mount ? { true => 'yes', false => 'no' }, # lint:ignore:selector_inside_resource
         'quota_limit'  => $quota_limit,
         'repositories' => $repositories + $alien_cache_repositories,
     }),
