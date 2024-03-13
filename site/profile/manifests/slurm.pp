@@ -194,7 +194,7 @@ class profile::slurm::base (
         'suspend_time'          => $suspend_time,
         'memlimit'              => $os_reserved_memory,
         'partitions'            => $partitions,
-	'enable_tmpfs_mounts'   => $enable_tmpfs_mounts,
+        'enable_tmpfs_mounts'   => $enable_tmpfs_mounts,
       }),
     group   => 'slurm',
     owner   => 'slurm',
@@ -572,7 +572,7 @@ class profile::slurm::node (
     } else {
       $cc_tmpfs_mounts_url = 'https://download.copr.fedorainfracloud.org/results/cmdntrf/spank-cc-tmpfs_mounts/'
     }
- 
+
     yumrepo { 'spank-cc-tmpfs_mounts-copr-repo':
       enabled             => true,
       descr               => 'Copr repo for spank-cc-tmpfs_mounts owned by cmdntrf',
