@@ -15,6 +15,7 @@ class profile::slurm::base (
   Integer $resume_timeout = 3600,
   Boolean $enable_x11_forwarding = true,
   String  $config_addendum = '',
+  Boolean $enable_tmpfs_mounts = true,
 )
 {
   include epel
@@ -559,13 +560,12 @@ export TFE_VAR_POOL=${tfe_var_pool}
 }
 
 # Slurm node class. This is where slurmd is ran.
-class profile::slurm::node (
-  Boolean $enable_tmpfs_mounts = true,
-)
-{
+class profile::slurm::node {
   contain profile::slurm::base
 
   $slurm_version = lookup('profile::slurm::base::slurm_version')
+  $enable_tmpfs_mounts = lookup('profile::slurm::base::enable_tmpfs_mounts')
+
   if $enable_tmpfs_mounts {
     if versioncmp($slurm_version, '22.05') >= 0 {
       $cc_tmpfs_mounts_url = "https://download.copr.fedorainfracloud.org/results/cmdntrf/spank-cc-tmpfs_mounts-${slurm_version}/"
