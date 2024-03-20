@@ -174,33 +174,33 @@ define profile::users::local_user (
   }
 
   if $authenticationmethods != '' {
-    file_line { "Include sshd_config.d":
-      path   => '/etc/ssh/sshd_config',
-      line   => "Include /etc/ssh/sshd_config.d/*.conf",
-    } ->
-    file { "/etc/ssh/sshd_config.d/":
+    file_line { 'Include sshd_config.d':
+      path => '/etc/ssh/sshd_config',
+      line => 'Include /etc/ssh/sshd_config.d/*.conf',
+    } 
+    -> file { '/etc/ssh/sshd_config.d/':
       ensure => directory,
       mode   => '0755',
       owner  => 'root',
       group  => 'root',
-    } ->
-    file { "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf":
+    }
+    -> file { "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf":
       ensure => file,
       mode   => '0644',
       owner  => 'root',
       group  => 'root',
-    } ->
-    file_line { "sshd_config match ${name}":
+    }
+    -> file_line { "sshd_config match ${name}":
+      path => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
+      line => "Match User ${name}",
+    }
+    -> file_line { "ssh_config authenticationmethods ${authenticationmethods}":
+      path => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
+      line => "           AuthenticationMethods ${authenticationmethods}",
+    }
+    -> file_line { 'sshd_config match all':
       path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
-      line   => "Match User ${name}",
-    } ->
-    file_line { "ssh_config authenticationmethods ${authenticationmethods}":
-      path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
-      line   => "           AuthenticationMethods ${authenticationmethods}",
-    } ->
-    file_line { "sshd_config match all":
-      path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
-      line   => "Match all",
+      line   => 'Match all',
       notify => Service['sshd']
     }
   }
