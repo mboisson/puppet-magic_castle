@@ -177,7 +177,7 @@ define profile::users::local_user (
     file_line { 'Include sshd_config.d':
       path => '/etc/ssh/sshd_config',
       line => 'Include /etc/ssh/sshd_config.d/*.conf',
-    } 
+    }
     -> file { '/etc/ssh/sshd_config.d/':
       ensure => directory,
       mode   => '0755',
