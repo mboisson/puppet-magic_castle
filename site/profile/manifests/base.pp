@@ -110,7 +110,7 @@ class profile::base (
   file_line { 'Include sshd_config.d':
     path    => '/etc/ssh/sshd_config',
     line    => 'Include /etc/ssh/sshd_config.d/*.conf',
-    notify  => Service['ssd'],
+    notify  => Service['sshd'],
     require => File['/etc/ssh/sshd_config.d/'],
   }
   file { '/etc/ssh/sshd_config.d/':
