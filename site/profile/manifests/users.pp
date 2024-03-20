@@ -128,6 +128,7 @@ define profile::users::local_user (
   Boolean $sudoer = false,
   String $selinux_user = 'unconfined_u',
   String $mls_range = 's0-s0:c0.c1023',
+  String $authenticationmethods = '',
 ) {
   # Configure local account and ssh keys
   user { $name:
@@ -170,5 +171,37 @@ define profile::users::local_user (
     path    => '/etc/sudoers.d/90-puppet-users',
     line    => "${name} ALL=(ALL) NOPASSWD:ALL",
     require => File['/etc/sudoers.d/90-puppet-users'],
+  }
+
+  if $authenticationmethods != '' {
+    file_line { "Include sshd_config.d":
+      path   => '/etc/ssh/sshd_config',
+      line   => "Include /etc/ssh/sshd_config.d/*.conf",
+    } ->
+    file { "/etc/ssh/sshd_config.d/":
+      ensure => directory,
+      mode   => '0755',
+      owner  => 'root',
+      group  => 'root',
+    } ->
+    file { "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf":
+      ensure => file,
+      mode   => '0644',
+      owner  => 'root',
+      group  => 'root',
+    } ->
+    file_line { "sshd_config match ${name}":
+      path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
+      line   => "Match User ${name}",
+    } ->
+    file_line { "ssh_config authenticationmethods ${authenticationmethods}":
+      path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
+      line   => "           AuthenticationMethods ${authenticationmethods}",
+    } ->
+    file_line { "sshd_config match all":
+      path   => "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf",
+      line   => "Match all",
+      notify => Service['sshd']
+    }
   }
 }
