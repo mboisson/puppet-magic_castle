@@ -106,6 +106,17 @@ class profile::base (
   file { glob('/tmp/terraform_*.sh'):
     ensure => absent,
   }
+
+  file_line { 'Include sshd_config.d':
+    path => '/etc/ssh/sshd_config',
+    line => 'Include /etc/ssh/sshd_config.d/*.conf',
+  }
+  file { '/etc/ssh/sshd_config.d/':
+    ensure => directory,
+    mode   => '0755',
+    owner  => 'root',
+    group  => 'root',
+  }
 }
 
 class profile::base::azure {
