@@ -160,3 +160,71 @@ cron::job:
     user: ebuser
     description: 'Generate Mii cache'
 ``` 
+
+# Creating a HAProxy instance
+If you are using external LDAP replicas instead of the local FreeIPA, you may wish to configure an instance to run a (HAProxy)[https://www.haproxy.org/]
+load balancer. This can be useful for example if you want to route all queries to LDAP through a single instance, so that the LDAPs' firewalls only need
+to be opened for a single IP address. 
+
+## Adding `puppetlabs-haproxy` to your `Puppetfile` 
+If you want to configure a HAProxy instance in your cluster, you will want to add the [`puppetlabs-haproxy`](https://forge.puppet.com/modules/puppetlabs/haproxy/readme) Puppet module to your `Puppetfile` 
+and define it in your [`main.tf`](https://github.com/ComputeCanada/magic_castle/tree/main/docs#419-puppetfile-optional). You would add
+```
+mod 'puppetlabs-haproxy', '8.0.0'
+``` 
+to your `Puppetfile`. 
+
+## Adding a HAProxy instance
+You need to add an instance with the `haproxy` module. Create a new tag, and apply it to your instances through the `main.tf`: 
+```
+magic_castle::site::tags:
+  haproxy:
+    - haproxy
+```
+and then in your `main.tf`, add the `sudo` tag to your instance: 
+```
+    haproxy  = { type = "p2-3gb", tags = ["haproxy"], count = 1 }
+```
+
+## Configuring your HAproxy instance
+Add the HAProxy configuration to your hieradata, for example: 
+```
+haproxy::merge_options: false
+haproxy::defaults_options:
+  log: global
+  option: ['tcplog', 'tcpka']
+  balance: first
+  timeout server: 1800s
+  timeout connect: 2s
+  mode: tcp
+
+haproxy::custom_fragment: |
+
+  frontend ldaps_service_front
+    mode                  tcp
+    bind                  %{lookup('terraform.self.local_ip')}:636
+    description           LDAPS Service
+    option                socket-stats
+    option                tcpka
+    timeout client        3600s
+    default_backend       ldaps_service_back
+
+  backend ldaps_service_back
+    server                ldap-1 <server1>:636 check fall 1 rise 1 inter 2s
+    server                ldap-2 <server1>:636 check fall 1 rise 1 inter 2s
+    option                ssl-hello-chk
+```
+
+
+## Configuring your other instances to query the HAProxy
+For a LDAP HAProxy, you will then want to configure your other instances to use that proxy as LDAP source: 
+```
+profile::sssd::client::domains:
+  MYLDAP:
+    id_provider: ldap
+    auth_provider: ldap
+    ldap_schema: rfc2307
+    ldap_uri:
+      - ldaps://haproxy1
+    .....
+```
