@@ -60,3 +60,54 @@ and use them to [encrypt your data](https://simp.readthedocs.io/en/master/HOWTO/
 If you are using Terraform cloud for your deployment, adding multifactor authentication with Duo will break terraform's deployment of files through SSH.
 In order to avoid this, you will need this [pull request](https://github.com/ComputeCanada/puppet-magic_castle/pull/340) merged in your fork of `puppet-magic_castle` 
 or wait until this pull request is merged upstream. 
+
+
+# Configuring `sudo`
+## Adding `saz-sudo` to your `Puppetfile` 
+If you want to configure `sudo` commands on your cluster, you will want to add the [`saz-sudo`](https://forge.puppet.com/modules/saz/sudo/readme) Puppet module to your `Puppetfile` 
+and define it in your [`main.tf`](https://github.com/ComputeCanada/magic_castle/tree/main/docs#419-puppetfile-optional). You would add
+```
+mod 'saz-sudo', '8.0.0'
+``` 
+to your `Puppetfile`. 
+
+## Adding `sudo` to your instances
+You need to add the `sudo` module to your instances using Magic Castle [tags](https://github.com/ComputeCanada/puppet-magic_castle/tree/main?tab=readme-ov-file#magic_castlesite). 
+For example, you can either recreate the `login` tag in your hieradata: 
+```
+magic_castle::site::tags:
+  login:
+    - profile::fail2ban
+    - profile::cvmfs::client
+    - profile::slurm::submitter
+    - profile::ssh::hostbased_auth::client
+    - profile::nfs::client
+    - profile::freeipa::client
+    - profile::rsyslog::client
+    - sudo
+```
+or define a new tag, and apply it to your instances through the `main.tf`: 
+```
+magic_castle::site::tags:
+  sudo:
+    - sudo
+```
+and then in your `main.tf`, add the `sudo` tag to your instance: 
+```
+    login  = { type = "...", tags = ["login", "public", "sudo"], count = 1 }
+```
+
+## Configuring `sudo` 
+Add the content of `sudoers` files to your hieradata. For example: 
+```
+sudo::ldap_enable: true
+sudo::config_file_replace: false
+sudo::prefix: '10-mysudoers_'
+sudo::purge_ignore: '[!10-mysudoers_]*'
+sudo::configs:
+  'general':
+    'content': |
+      Cmnd_Alias ADMIN_ROOTCMD = /bin/cat *, /bin/ls *, /bin/chmod *, /bin/vim *, /usr/bin/su -, /bin/yum *, /bin/less *, /bin/grep *, /bin/kill *, /usr/sbin/reboot
+      %admin ALL=(ALL)      NOPASSWD: ADMIN_ROOTCMD
+```
+
