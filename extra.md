@@ -97,7 +97,7 @@ and then in your `main.tf`, add the `sudo` tag to your instance:
     login  = { type = "...", tags = ["login", "public", "sudo"], count = 1 }
 ```
 
-## Configuring `sudo` 
+## Adding your `sudo` configuration
 Add the content of `sudoers` files to your hieradata. For example: 
 ```
 sudo::ldap_enable: true
@@ -111,3 +111,52 @@ sudo::configs:
       %admin ALL=(ALL)      NOPASSWD: ADMIN_ROOTCMD
 ```
 
+# Configuring a system's `cron` 
+## Adding `puppet-cron` to your `Puppetfile` 
+If you want to configure `cron` commands on your cluster, you will want to add the [`puppet-cron`]([https://forge.puppet.com/modules/saz/sudo/readme](https://github.com/voxpupuli/puppet-cron)) Puppet module to your `Puppetfile` 
+and define it in your [`main.tf`](https://github.com/ComputeCanada/magic_castle/tree/main/docs#419-puppetfile-optional). You would add
+```
+mod 'puppet-cron', '2.0.0'
+``` 
+to your `Puppetfile`. 
+
+## Adding `cron` to your instances
+You need to add the `cron` module to your instances using Magic Castle [tags](https://github.com/ComputeCanada/puppet-magic_castle/tree/main?tab=readme-ov-file#magic_castlesite). 
+For example, you can either recreate the `login` tag in your hieradata: 
+```
+magic_castle::site::tags:
+  login:
+    - profile::fail2ban
+    - profile::cvmfs::client
+    - profile::slurm::submitter
+    - profile::ssh::hostbased_auth::client
+    - profile::nfs::client
+    - profile::freeipa::client
+    - profile::rsyslog::client
+    - cron
+```
+or define a new tag, and apply it to your instances through the `main.tf`: 
+```
+magic_castle::site::tags:
+  cron:
+    - cron
+```
+and then in your `main.tf`, add the `sudo` tag to your instance: 
+```
+    login  = { type = "...", tags = ["login", "public", "cron"], count = 1 }
+```
+
+## Adding your `cron` configuration
+Add the configuration to your hieradata. For example: 
+```
+cron::job:
+  mii_cache:
+    command: 'source $HOME/.bashrc; /etc/rsnt/generate_mii_index.py --arch sse3 avx avx2 avx512 &>> /home/ebuser/crontab_mii.log'
+    minute: '*/10'
+    hour: '*'
+    date: '*'
+    month: '*'
+    weekday: '*'
+    user: ebuser
+    description: 'Generate Mii cache'
+``` 
