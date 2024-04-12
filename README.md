@@ -40,6 +40,7 @@ The `profile::` sections list the available classes, their role and their parame
 - [`profile::rsyslog::client`](#profilersyslogclient)
 - [`profile::rsyslog::server`](#profilersyslogserver)
 - [`profile::slurm::base`](#profileslurmbase)
+- [`profile::slurm::node`](#profileslurmnode)
 - [`profile::slurm::accounting`](#profileslurmaccounting)
 - [`profile::slurm::controller`](#profileslurmcontroller)
 - [`profile::software_stack`](#profilesoftware_stack)
@@ -932,6 +933,22 @@ When `profile::slurm::base` is included, these classes are included too:
 - [`epel`](https://forge.puppet.com/modules/puppet/epel/readme)
 - [`profile::consul`](#profileconsul)
 - [`profile::base::powertools`](#profilebasepowertools)
+
+## `profile::slurm::node`
+This class allows some configuration for the Slurm compute nodes.
+
+### parameters
+| Variable                | Description                                             | Type   |
+| :---------------------- | :------------------------------------------------------ | :----- |
+| `pam_access_group`      | Group that can access the node regardless of Slurm jobs | String |
+
+<details>
+<summary>default values</summary>
+
+```yaml
+profile::slurm::node::pam_access_group: undef
+```
+</details>
 
 
 ## `profile::slurm::accounting`
