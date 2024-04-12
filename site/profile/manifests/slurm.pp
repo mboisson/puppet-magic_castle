@@ -625,7 +625,7 @@ class profile::slurm::node (
   }
 
   if $pam_access_group and $pam_access_group != '' {
-    $access_conf_addon = "+:$pam_access_group:ALL"
+    $access_conf_addon = "+:${pam_access_group}:ALL"
   }
   else {
     $access_conf_addon = ''
