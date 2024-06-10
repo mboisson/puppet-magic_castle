@@ -118,7 +118,7 @@ class profile::base (
   }
   file { '/etc/ssh/sshd_config.d/':
     ensure => directory,
-    mode   => '0755',
+    mode   => '0700',
     owner  => 'root',
     group  => 'root',
   }
