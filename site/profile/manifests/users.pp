@@ -211,7 +211,7 @@ define profile::users::local_user (
       ensure    => present,
       condition => "User ${name}",
       key       => 'AuthenticationMethods',
-      value     => "${authenticationmethods}"
+      value     => $authenticationmethods
     }
   }
 }
