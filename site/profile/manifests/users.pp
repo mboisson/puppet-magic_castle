@@ -174,17 +174,11 @@ define profile::users::local_user (
   }
 
   if $authenticationmethods != '' {
-    file { "/etc/ssh/sshd_config.d/authenticationmethods_${name}.conf":
-      ensure  => file,
-      mode    => '0644',
-      owner   => 'root',
-      group   => 'root',
-      notify  => Service['sshd'],
-      content => @("EOT")
-Match User ${name}
-  AuthenticationMethods ${authenticationmethods}
-Match all
-|EOT
+    sshd_config { "${name} authenticationmethods":
+      ensure    => present,
+      condition => "User ${name}",
+      key       => 'AuthenticationMethods',
+      value     => "${authenticationmethods}"
     }
   }
 }
