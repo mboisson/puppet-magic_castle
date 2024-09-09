@@ -131,6 +131,13 @@ class profile::cvmfs::client (
       |EOF
   }
 
+  file_line { 'cvmfs_mount_dir':
+    ensure => present,
+    path   => '/etc/cvmfs/default.conf',
+    line   => "  readonly CVMFS_MOUNT_DIR=${cvmfs_root}",
+    match  => '^  readonly CVMFS_MOUNT_DIR=/cvmfs$',
+  }
+
   file { '/etc/cvmfs/default.local.ctmpl':
     content => epp('profile/cvmfs/default.local', {
         'strict_mount' => $strict_mount ? { true => 'yes', false => 'no' }, # lint:ignore:selector_inside_resource
