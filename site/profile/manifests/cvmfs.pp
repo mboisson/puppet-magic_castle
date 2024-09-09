@@ -10,11 +10,6 @@ class profile::cvmfs::install {
     ensure  => 'installed',
     require => [Package['cvmfs-repo']],
   }
-
-  file { '/cvmfs':
-    ensure  => directory,
-    seltype => 'root_t',
-  }
 }
 
 type PublisherConfiguration = Struct[
@@ -38,6 +33,11 @@ class profile::cvmfs::publisher (
   package { 'cvmfs-server':
     ensure  => 'installed',
     require => [Package['cvmfs']],
+  }
+
+  file { '/cvmfs':
+    ensure  => directory,
+    seltype => 'root_t',
   }
 
   file { '/etc/cvmfs/keys':
