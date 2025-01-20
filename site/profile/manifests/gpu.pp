@@ -82,19 +82,25 @@ class profile::gpu::install (
 
 class profile::gpu::install::passthrough (
   Array[String] $packages,
+  String $nvidia_driver_stream = '550-dkms'
 ) {
   $os = "rhel${::facts['os']['release']['major']}"
   $arch = $::facts['os']['architecture']
-  if versioncmp($::facts['os']['release']['major'], '8') >= 0 {
-    $repo_config_cmd = 'dnf config-manager'
-  } else {
-    $repo_config_cmd = 'yum-config-manager'
-  }
 
   exec { 'cuda-repo':
-    command => "${repo_config_cmd} --add-repo http://developer.download.nvidia.com/compute/cuda/repos/${os}/${arch}/cuda-${os}.repo",
+    command => "dnf config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/${os}/${arch}/cuda-${os}.repo",
     creates => "/etc/yum.repos.d/cuda-${os}.repo",
     path    => ['/usr/bin'],
+  }
+
+  package { 'nvidia-stream':
+    ensure      => $nvidia_driver_stream,
+    name        => 'nvidia-driver',
+    provider    => dnfmodule,
+    enable_only => true,
+    require     => [
+      Exec['cuda-repo'],
+    ],
   }
 
   $mig_profile = lookup("terraform.instances.${facts['networking']['hostname']}.specs.mig", Variant[Undef, Hash[String, Integer]], undef, {})
@@ -106,6 +112,7 @@ class profile::gpu::install::passthrough (
   package { $packages:
     ensure  => 'installed',
     require => [
+      Package['nvidia-stream'],
       Package['kernel-devel'],
       Exec['cuda-repo'],
       Yumrepo['epel'],
@@ -115,25 +122,14 @@ class profile::gpu::install::passthrough (
   # Used by slurm-job-exporter to export GPU metrics
   -> package { 'datacenter-gpu-manager': }
 
-  -> file { '/run/nvidia-persistenced':
-    ensure => directory,
-    owner  => 'nvidia-persistenced',
-    group  => 'nvidia-persistenced',
-    mode   => '0755',
-  }
-
   -> augeas { 'nvidia-persistenced.service':
     context => '/files/lib/systemd/system/nvidia-persistenced.service/Service',
     changes => [
-      'set User/value nvidia-persistenced',
-      'set Group/value nvidia-persistenced',
+      'set DynamicUser/value yes',
+      'set StateDirectory/value nvidia-persistenced',
+      'set RuntimeDirectory/value nvidia-persistenced',
       'rm ExecStart/arguments',
     ],
-  }
-
-  file { '/usr/lib/tmpfiles.d/nvidia-persistenced.conf':
-    content => 'd /run/nvidia-persistenced 0755 nvidia-persistenced nvidia-persistenced -',
-    mode    => '0644',
   }
 }
 
@@ -232,7 +228,7 @@ class profile::gpu::install::vgpu (
 
   # Used by slurm-job-exporter to export GPU metrics
   # DCGM does not work with GRID VGPU, most of the stats are missing
-  ensure_packages(['python3'], { ensure => 'present' })
+  ensure_packages(['python3', 'python3-pip'], { ensure => 'present' })
   $py3_version = lookup('os::redhat::python3::version')
 
   exec { 'pip install nvidia-ml-py':
@@ -247,9 +243,9 @@ class profile::gpu::install::vgpu::rpm (
   String $source,
   Array[String] $packages,
 ) {
-  $source_pkg_name = split(split($source, '[/]')[-1], '[.]')[0]
+  $source_pkg_name = (split($source, '[/]')[-1]).regsubst(/\.rpm/, '', 'G')
   package { 'vgpu-repo':
-    ensure   => 'latest',
+    ensure   => 'installed',
     provider => 'rpm',
     name     => $source_pkg_name,
     source   => $source,

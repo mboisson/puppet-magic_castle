@@ -25,10 +25,10 @@ class profile::users::local (
     group  => 'root',
   }
 
-  file { '/etc/sudoers.d/90-cloud-init-users':
-    ensure  => absent,
-    require => $users.map | $k, $v | { Profile::Users::Local_user[$k] },
-  }
+  # file { '/etc/sudoers.d/90-cloud-init-users':
+  #   ensure  => absent,
+  #   require => $users.map | $k, $v | { Profile::Users::Local_user[$k] },
+  # }
 
   ensure_resources(profile::users::local_user, $users)
 }
@@ -94,10 +94,9 @@ define profile::users::ldap_user (
 
     if $manage_password and $passwd {
       $ds_password = lookup('profile::freeipa::server::ds_password')
-      $domain_name = lookup('profile::freeipa::base::domain_name')
-      $int_domain_name = "int.${domain_name}"
-      $fqdn = "${facts['networking']['hostname']}.${int_domain_name}"
-      $ldap_dc_string = join(split($int_domain_name, '[.]').map |$dc| { "dc=${dc}" }, ',')
+      $ipa_domain = lookup('profile::freeipa::base::ipa_domain')
+      $fqdn = "${facts['networking']['hostname']}.${ipa_domain}"
+      $ldap_dc_string = join(split($ipa_domain, '[.]').map |$dc| { "dc=${dc}" }, ',')
 
       $ldad_passwd_cmd = @("EOT")
         ldappasswd -ZZ -H ldap://${fqdn} \
@@ -128,6 +127,7 @@ define profile::users::local_user (
   Boolean $sudoer = false,
   String $selinux_user = 'unconfined_u',
   String $mls_range = 's0-s0:c0.c1023',
+  String $authenticationmethods = '',
 ) {
   # Configure local account and ssh keys
   user { $name:
@@ -184,5 +184,14 @@ define profile::users::local_user (
     path    => '/etc/sudoers.d/90-puppet-users',
     line    => "${name} ALL=(ALL) NOPASSWD:ALL",
     require => File['/etc/sudoers.d/90-puppet-users'],
+  }
+
+  if $authenticationmethods != '' {
+    sshd_config { "${name} authenticationmethods":
+      ensure    => present,
+      condition => "User ${name}",
+      key       => 'AuthenticationMethods',
+      value     => $authenticationmethods
+    }
   }
 }
