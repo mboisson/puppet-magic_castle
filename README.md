@@ -964,13 +964,13 @@ This class allows some configuration for the Slurm compute nodes.
 ### parameters
 | Variable                | Description                                             | Type   |
 | :---------------------- | :------------------------------------------------------ | :----- |
-| `pam_access_group`      | Group that can access the node regardless of Slurm jobs | String |
+| `pam_access_groups`     | Groups that can access the node regardless of Slurm jobs | Array[String] |
 
 <details>
 <summary>default values</summary>
 
 ```yaml
-profile::slurm::node::pam_access_group: undef
+profile::slurm::node::pam_access_groups: ['wheel']
 ```
 </details>
 
