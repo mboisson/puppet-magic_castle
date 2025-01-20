@@ -561,7 +561,7 @@ export TFE_VAR_POOL=${tfe_var_pool}
 
 # Slurm node class. This is where slurmd is ran.
 class profile::slurm::node (
-  String  $pam_access_group = undef,
+  Array[String] $pam_access_groups = ['wheel'],
 ) {
   contain profile::slurm::base
 
@@ -624,24 +624,19 @@ class profile::slurm::node (
     require  => Pam['Add pam_slurm_adopt']
   }
 
-  if $pam_access_group and $pam_access_group != '' {
-    $access_conf_addon = "+:${pam_access_group}:ALL"
-  }
-  else {
-    $access_conf_addon = ''
-  }
-  $access_conf = "
+  $access_conf = @(END)
 # Allow root cronjob
 + : root : cron crond :0 tty1 tty2 tty3 tty4 tty5 tty6
-# Allow admin to connect, deny all other
-+:wheel:ALL
-${access_conf_addon}
+# Allow other groups if any
+<% for $pam_access_groups.each | $group | { %->
++:<%= $group %>:ALL
+<% } -%>
 -:ALL:ALL
-"
+END
 
   file { '/etc/security/access.conf':
     ensure  => present,
-    content => $access_conf
+    content => inline_template($access_conf, { 'pam_access_groups' => $pam_access_groups }),
   }
 
   selinux::module { 'sshd_pam_slurm_adopt':
