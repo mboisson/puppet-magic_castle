@@ -586,15 +586,15 @@ class profile::slurm::node (
 # Allow root cronjob
 + : root : cron crond :0 tty1 tty2 tty3 tty4 tty5 tty6
 # Allow other groups if any
-<% for $pam_access_groups.each | $group | { %->
+<% $pam_access_groups.each | $group | { %>
 +:<%= $group %>:ALL
-<% } -%>
+<% } %>
 -:ALL:ALL
-END
+|END
 
   file { '/etc/security/access.conf':
     ensure  => present,
-    content => inline_template($access_conf, { 'pam_access_groups' => $pam_access_groups }),
+    content => inline_epp($access_conf, { 'pam_access_groups' => $pam_access_groups }),
   }
 
   selinux::module { 'sshd_pam_slurm_adopt':
