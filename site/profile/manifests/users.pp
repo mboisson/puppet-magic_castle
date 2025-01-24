@@ -133,7 +133,7 @@ define profile::users::local_user (
   Optional[String] $shell = '/bin/bash',
   Optional[Integer] $uid = undef,
   Optional[Integer] $gid = undef,
-  Optional[String] $group = $name,
+  String $group = $name,
   String $home = "/${name}",
 ) {
   group { $group:
