@@ -1421,7 +1421,7 @@ A `profile::users::local_user` is defined as a dictionary with the following key
 | `shell`           | Default shell of the user                       | String          | Yes (/bin/bash)      |
 | `uid`             | UID of the user                                 | Integer         | Yes (undef)          |
 | `gid`             | GID of the user                                 | Integer         | Yes (undef)          |
-| `group`           | Primary group name of the user                  | String          | Yes (username)       |
+| `group`           | Primary group name of the user                  | String          | No (username)        |
 | `home`            | Home directory of the user                      | String          | Yes (/username)      |
 
 

@@ -130,23 +130,24 @@ define profile::users::local_user (
   String $authenticationmethods = '',
   Boolean $manage_home = true,
   Boolean $purge_ssh_keys = true,
-  Optional[String] $shell = '/bin/bash',
+  Optional[String] $shell = undef,
   Optional[Integer] $uid = undef,
   Optional[Integer] $gid = undef,
   String $group = $name,
   String $home = "/${name}",
 ) {
-  group { $group:
-    ensure     => present,
-    gid        => $gid,
-    forcelocal => true,
-  }
+  ensure_resource('group', $group, {
+      ensure     => present,
+      gid        => $gid,
+      forcelocal => true,
+    }
+  )
   # Configure local account and ssh keys
   user { $name:
     ensure         => present,
     forcelocal     => true,
     uid            => $uid,
-    gid            => $gid,
+    gid            => $group,
     groups         => $groups,
     home           => $home,
     purge_ssh_keys => $purge_ssh_keys,
