@@ -37,10 +37,8 @@ class profile::rsyslog::client {
 class profile::rsyslog::server {
   include profile::rsyslog::base
 
-  consul::service { 'rsyslog':
-    port    => 514,
-    require => Tcp_conn_validator['consul'],
-    token   => lookup('profile::consul::acl_api_token'),
+  @consul::service { 'rsyslog':
+    port => 514,
   }
 
   file { '/etc/rsyslog.d/98-remotelogs.conf':

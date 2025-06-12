@@ -9,7 +9,7 @@
 class profile::slurm::base (
   String $cluster_name,
   String $munge_key,
-  Enum['23.02', '23.11', '24.05'] $slurm_version,
+  Enum['23.11', '24.05', '24.11', '25.05'] $slurm_version,
   Integer $os_reserved_memory,
   Integer $suspend_time = 3600,
   Integer $suspend_rate = 20,
@@ -22,7 +22,6 @@ class profile::slurm::base (
 {
   include epel
   include profile::base::powertools
-  include profile::consul
 
   group { 'slurm':
     ensure => 'present',
@@ -60,6 +59,41 @@ class profile::slurm::base (
 
   package { 'munge':
     ensure  => 'installed',
+  }
+
+  # Sometime /var/run/munge is not created.
+  # Munge RPM provides /usr/lib/tmpfiles.d/munge.conf
+  # tmpfiles.d config was replaced with RuntimeDirectory as of munge 0.5.14
+  # but we are stuck with 0.5.13 as upstream has not updated munge
+  # since 2021. The next 2 file_lines make sure munge does not rely on
+  # systemd-tmpfiles-setup.service.
+  # Ref: https://github.com/dun/munge/commit/3eed37e3ca73c14b679394df7be151d27566b0fe
+  # Ref: https://github.com/dun/munge/issues/75
+  file_line { 'munge_runtimedirectory':
+    path    => '/usr/lib/systemd/system/munge.service',
+    match   => '^RuntimeDirectory=',
+    line    => 'RuntimeDirectory=munge',
+    after   => 'Group=munge',
+    require => Package['munge'],
+    notify  => Service['munge'],
+  }
+
+  file_line { 'munge_runtimedirectorymode':
+    path    => '/usr/lib/systemd/system/munge.service',
+    match   => '^RuntimeDirectoryMode=',
+    line    => 'RuntimeDirectoryMode=0755',
+    after   => 'Group=munge',
+    require => Package['munge'],
+    notify  => Service['munge'],
+  }
+
+  # Fix a warning in systemctl status munge about the location of the PID file.
+  file_line { 'munge_pidfile':
+    path    => '/usr/lib/systemd/system/munge.service',
+    match   => '^PIDFile=',
+    line    => 'PIDFile=/run/munge/munged.pid',
+    require => Package['munge'],
+    notify  => Service['munge'],
   }
 
   file { '/var/log/slurm':
@@ -307,15 +341,13 @@ class profile::slurm::accounting(
     before    => Service['slurmctld']
   }
 
-  consul::service { 'slurmdbd':
-    port    => $dbd_port,
-    require => Tcp_conn_validator['consul'],
-    token   => lookup('profile::consul::acl_api_token'),
+  @consul::service { 'slurmdbd':
+    port => $dbd_port,
   }
 
   wait_for { 'slurmdbd_started':
     query             => 'cat /var/log/slurm/slurmdbd.log',
-    regex             => '^\[[.:0-9\-T]{23}\] slurmdbd version \d+.\d+.\d+(-\d+){0,1} started$',
+    regex             => '^\[[.:0-9\-T]{23}\] slurmdbd version \d+.\d+.\d+(-\d+){0,1}(rc\d+){0,1} started$',
     polling_frequency => 10,  # Wait up to 4 minutes (24 * 10 seconds).
     max_retries       => 24,
     refreshonly       => true,
@@ -365,7 +397,6 @@ class profile::slurm::accounting(
     create_group => 'slurm',
     postrotate   => '/usr/bin/pkill -x --signal SIGUSR2 slurmdbd',
   }
-
 }
 
 # Slurm controller class. This where slurmctld is ran.
@@ -494,10 +525,8 @@ export TFE_VAR_POOL=${tfe_var_pool}
     ),
   }
 
-  consul::service { 'slurmctld':
-    port    => 6817,
-    require => Tcp_conn_validator['consul'],
-    token   => lookup('profile::consul::acl_api_token'),
+  @consul::service { 'slurmctld':
+    port => 6817,
   }
 
   package { 'slurm-slurmctld':

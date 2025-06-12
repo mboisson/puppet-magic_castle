@@ -20,6 +20,7 @@ mod 'puppet-healthcheck', '1.0.1'
 mod 'puppet-kmod', '4.0.0'
 mod 'puppet-logrotate', '5.0.0'
 mod 'puppet-prometheus', '12.5.0'
+mod 'puppet-prometheus_reporter', '2.0.0'
 mod 'puppet-rsyslog', '7.1.0'
 mod 'puppet-selinux', '3.4.1'
 mod 'puppet-squid', '3.0.0'
@@ -39,4 +40,4 @@ mod 'saz-limits', '3.0.4'
 
 mod 'computecanada-jupyterhub',
     :git => 'https://github.com/ComputeCanada/puppet-jupyterhub.git',
-    :ref => 'v6.8.1'
+    :ref => 'v6.8.2'

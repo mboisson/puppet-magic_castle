@@ -111,7 +111,6 @@ magic_castle::site::tags:
     - profile::freeipa::mokey
     - profile::slurm::accounting
     - profile::accounts
-    - profile::users::ldap
   node:
     - profile::cvmfs::client
     - profile::gpu
@@ -335,12 +334,14 @@ if its local ip address is declared in `profile::consul::servers`. Otherwise, it
 | Variable  | Description                         | Type          |
 | :-------- | :---------------------------------- | ------------- |
 | `servers` | IP addresses of the consul servers  | Array[String] |
+| `acl_api_token` | Secret in the UUID form allowing agents to interact with consul API | String |
 
 <details>
 <summary>default values</summary>
 
 ```yaml
 profile::consul::servers: "%{alias('terraform.tag_ip.puppet')}"
+profile::consul::acl_api_token: ENC[PKCS7,...]
 ```
 </details>
 
@@ -605,6 +606,7 @@ This class configures files and services of a FreeIPA server.
 | `admin_password` | Password of the FreeIPA admin account       | String         |
 | `ds_password`    | Password of the directory server            | String         |
 | `hbac_services`  | Name of services to control with HBAC rules | Array[String]  |
+| `enable_mokey`   | Enable the [mokey service](#profilefreeipamokey) | Booelan   |
 
 <details>
 <summary>default values</summary>
@@ -614,6 +616,7 @@ profile::freeipa::server::id_start: 60001
 profile::freeipa::server::admin_password: ENC[PKCS7,...]
 profile::freeipa::server::ds_password: ENC[PKCS7,...]
 profile::freeipa::server::hbac_services: ["sshd", "jupyterhub-login"]
+profile::freeipa::server::enable_mokey: true
 ```
 
 </details>
@@ -850,6 +853,7 @@ internal services to the Internet.
 | `main2sub_redir` | Subdomain to redirect to when hitting domain name directly. Empty means no redirect. | String                      |
 | `subdomains`     | Subdomain names used to create vhosts to internal http endpoints                     | Hash[String, String]        |
 | `remote_ips`     | List of allowed ip addresses per subdomain. Undef mean no restrictions.              | Hash[String, Array[String]] |
+| `robots_txt`     | Content of a robots.txt file which will be served for all hosts.                     | String                      |
 
 <details>
 <summary>default values</summary>
@@ -862,6 +866,7 @@ profile::reverse_proxy::subdomains:
   jupyter: "https://127.0.0.1:8000"
 profile::reverse_proxy::main2sub_redir: "jupyter"
 profile::reverse_proxy::remote_ips: {}
+profile::reverse_proxy::robots_txt: "User-agent: *\nDisallow: /"
 ```
 </details>
 

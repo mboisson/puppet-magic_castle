@@ -3,13 +3,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-# [14.2.1] 2025-02-21
+## [14.3.0] 2025-05-22
+
+### Added
+- Added parameters to define suspend and resume rates in Slurm (PR #421)
+- Added dependency on kmod::load for nvidia-mig-parted apply (PR #422)
+- Added annotations using `rake test` results (PR #423)
+- Added bootstrap tag to profile::vector
+- Added an alias for sudoer account to display eyaml bootstrap values (PR #426)
+- Added a default robots.txt that disallows indexing of reverse proxy subdomains (PR #427)
+- Added puppet metrics to Prometheus using puppet reporter (PR #434)
+- Added 25.05 to list of available slurm versions
+
+### Changed
+- Declaration of physical_volume is now ignored if device isn't found
+- Fixed munge systemd service file (PR #431)
+- Bumped puppet-jupyterhub to 6.8.1
+- Made prometheus related services virtual puppet resources (PR #432)
+- Moved require Tcp_conn_validator['consul'] to profile::consul (PR #435)
+- Improved integration Slurm prometheus exporter (PR #436)
+- Made sure all services using them are stopped before GPU drivers are unloaded (PR #438)
+- Fixed issues that prevents mgmt and nfs tags to be greater than 1 (PR #440)
+- Bumped slurm to 24.11 (#419)
+- Fixed iptables missing /run/lock/subsys (PR #444)
+
+## [14.2.1] 2025-02-21
 
 ### Changed
 - Bumped Slurm Terraform Cloud autoscaler to 0.6.1
 - Bumped puppet-jupyterhub to 6.8.1
 
-# [14.2.0] 2025-02-20
+## [14.2.0] 2025-02-20
 
 ### Added
 
