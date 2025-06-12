@@ -194,6 +194,7 @@ class profile::freeipa::server (
   Array[String] $hbac_services = ['sshd', 'jupyterhub-login'],
   Boolean $enable_mokey = true,
   Array[String] $automember_groups = ['def-sponsor00']
+  Optional[Hash[String, Array[String]]] $groups_hbacrules = undef
 ) {
   include profile::base::etc_hosts
   include profile::freeipa::base
@@ -407,6 +408,34 @@ class profile::freeipa::server (
       File['/etc/ipa/group_automember_rules.py'],
       Exec['ipa-install'],
     ],
+
+    if $groups_hbacrules != undef {
+    file { '/etc/ipa/hbac_users.py':
+      mode    => '0700',
+      content => epp(
+        'profile/freeipa/hbac_users.py',
+        {
+          'groups_rules' => $groups_hbacrules
+        }
+      ),
+    }
+
+    # make sure LDAP users and groups are created before
+    Profile::Users::Ldap_user<| |> -> Exec['hbac_users']
+    exec { 'hbac_users':
+      command     => 'kinit_wrapper ipa console /etc/ipa/hbac_users.py',
+      refreshonly => true,
+      require     => [
+        File['kinit_wrapper'],
+        Exec['hbac_rules']
+      ],
+      environment => ["IPA_ADMIN_PASSWD=${admin_password}"],
+      path        => ['/bin', '/usr/bin', '/sbin','/usr/sbin'],
+      subscribe   => [
+        File['/etc/ipa/hbac_users.py'],
+        Exec['ipa-install'],
+      ],
+    }
   }
 
   service { 'ipa':
