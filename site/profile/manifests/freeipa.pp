@@ -53,6 +53,17 @@ class profile::freeipa::client (String $server_ip) {
   $realm = upcase($ipa_domain)
   $ipaddress = lookup('terraform.self.local_ip')
 
+  if $facts['virtual'] =~ /^(container|lxc).*$/ {
+    file_line { 'chronyd_disable_clock_control':
+      ensure  => present,
+      require => Package['ipa-client'],
+      before  => Exec['ipa-install'],
+      path    => '/etc/sysconfig/chronyd',
+      match   => '^OPTIONS',
+      line    => 'OPTIONS="-F 2 -x"',
+    }
+  }
+
   file { '/etc/NetworkManager/conf.d/zzz-puppet.conf':
     mode    => '0644',
     content => epp('profile/freeipa/zzz-puppet.conf',
@@ -472,7 +483,6 @@ class profile::freeipa::mokey (
   String $password,
   Boolean $enable_user_signup,
   Boolean $require_verify_admin,
-  Array[String] $access_tags,
 ) {
   include mysql::server
 
@@ -654,20 +664,5 @@ class profile::freeipa::mokey (
     subscribe   => [
       Exec['ipa_self-signup_automember'],
     ],
-  }
-
-  $access_tags.each |$tag| {
-    exec { "ipa_hbacrule_self-signup_${tag}":
-      command     => "kinit_wrapper ipa hbacrule-add-user ${tag} --groups=self-signup",
-      refreshonly => true,
-      environment => ["IPA_ADMIN_PASSWD=${ipa_passwd}"],
-      require     => [File['kinit_wrapper'],],
-      path        => ['/bin', '/usr/bin', '/sbin','/usr/sbin'],
-      returns     => [0, 1, 2],
-      subscribe   => [
-        Exec['ipa_group_self-signup'],
-        Exec['hbac_rules'],
-      ],
-    }
   }
 }

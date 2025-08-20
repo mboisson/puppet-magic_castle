@@ -408,7 +408,6 @@ class profile::slurm::controller (
   String $tfe_var_pool = 'pool',
 ) {
   contain profile::slurm::base
-  include profile::mail::server
 
   $instances = lookup('terraform.instances')
   $nodes = $instances.filter|$key, $attr| { 'node' in $attr['tags'] }
@@ -514,12 +513,14 @@ export TFE_VAR_POOL=${tfe_var_pool}
 |EOT
   }
 
+
   file { '/etc/slurm/job_submit.lua':
     ensure  => 'present',
     owner   => 'slurm',
     group   => 'slurm',
     content => epp('profile/slurm/job_submit.lua',
       {
+        'selinux_enabled' => $facts['os']['selinux']['enabled'],
         'selinux_context' => $selinux_context,
       }
     ),
@@ -655,41 +656,42 @@ class profile::slurm::node (
     source_pp => 'puppet:///modules/profile/slurm/slurmd.pp',
   }
 
+  if !($facts['virtual'] =~ /^(container|lxc).*$/) {
+    # Implementation of user limits as recommended in
+    # https://cloud.google.com/architecture/best-practices-for-using-mpi-on-compute-engine
+    # + some common values found on Compute Canada clusters
+    limits::limits{'*/core':
+      soft => '0',
+      hard => 'unlimited'
+    }
 
-  # Implementation of user limits as recommended in
-  # https://cloud.google.com/architecture/best-practices-for-using-mpi-on-compute-engine
-  # + some common values found on Compute Canada clusters
-  limits::limits{'*/core':
-    soft => '0',
-    hard => 'unlimited'
-  }
+    limits::limits{'*/nproc':
+      soft => '4096',
+    }
 
-  limits::limits{'*/nproc':
-    soft => '4096',
-  }
+    limits::limits{'root/nproc':
+      soft => 'unlimited',
+    }
 
-  limits::limits{'root/nproc':
-    soft => 'unlimited',
-  }
+    limits::limits{'*/memlock':
+      both => 'unlimited',
+    }
 
-  limits::limits{'*/memlock':
-    both => 'unlimited',
-  }
+    limits::limits{'*/stack':
+      both => 'unlimited',
+    }
 
-  limits::limits{'*/stack':
-    both => 'unlimited',
-  }
+    limits::limits{'*/nofile':
+      both => '1048576',
+    }
 
-  limits::limits{'*/nofile':
-    both => '1048576',
-  }
+    limits::limits{'*/cpu':
+      both => 'unlimited',
+    }
 
-  limits::limits{'*/cpu':
-    both => 'unlimited',
-  }
-
-  limits::limits{'*/rtprio':
-    both => 'unlimited',
+    limits::limits{'*/rtprio':
+      both => 'unlimited',
+    }
   }
 
   ensure_resource('file', '/localscratch', { 'ensure' => 'directory', 'seltype' => 'tmp_t' })
@@ -750,6 +752,19 @@ class profile::slurm::node (
   User <| |> -> Service['slurmd']
   Group <| |> -> Service['slurmd']
   Pam <| |> -> Service['slurmd']
+
+  if $facts['virtual'] =~ /^(container|lxc).*$/ {
+    # When running slurmd in containers, the reported boot time
+    # corresponds to the host boot time. This leads slurmctld to
+    # think the node has not properly booted when using
+    # slurm powersaving / autoscaling function. By adding `-b`
+    # option to slurmd, the reported boot time corresponds to the
+    # time when slurmd started instead.
+    # Ref: https://support.schedmd.com/show_bug.cgi?id=4039
+    file { '/etc/sysconfig/slurmd':
+      content => 'SLURMD_OPTIONS="-b"',
+    }
+  }
 
   service { 'slurmd':
     ensure    => 'running',

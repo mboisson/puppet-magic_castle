@@ -2,6 +2,8 @@
 lookup_options:
   profile::users::ldap::users:
     merge: 'deep'
+  profile::users::ldap::groups:
+    merge: 'deep'
   profile::users::local::users:
     merge: 'deep'
   jupyterhub::jupyterhub_config_hash:
@@ -10,6 +12,8 @@ lookup_options:
     merge: 'deep'
   prometheus::extra_alert:
     merge: 'hash'
+  profile::volumes::devices:
+    merge: 'deep'
 
 profile::base::version: 14.3.0
 profile::base::packages: []
@@ -263,12 +267,11 @@ profile::squid::server::cvmfs_acl_regex:
   - '^(object-.*\.cloud\.computecanada\.ca)$'
   - '^(.*-cvmfs\.openhtc\.io)$'
   - '^(cvmfs-.*\.genap\.ca)$'
-  - '^(.*\.cvmfs\.eessi-infra\.org)$'
   - '^(.*s1\.eessi\.science)$'
 
+profile::cvmfs::client::disable_autofs: "%{facts.is_unprivileged_container}"
 profile::cvmfs::client::quota_limit: 4096
 profile::cvmfs::client::repositories:
-  - pilot.eessi-hpc.org
   - software.eessi.io
   - cvmfs-config.computecanada.ca
   - soft.computecanada.ca
@@ -279,24 +282,26 @@ profile::cvmfs::local_user::gid: 8000131
 profile::freeipa::mokey::port: 12345
 profile::freeipa::mokey::enable_user_signup: true
 profile::freeipa::mokey::require_verify_admin: true
-profile::freeipa::mokey::access_tags: "%{alias('profile::users::ldap::access_tags')}"
 
 profile::freeipa::server::id_start: 60001
 profile::software_stack::min_uid: "%{alias('profile::freeipa::server::id_start')}"
 
 profile::slurm::base::slurm_version: '24.11'
 profile::slurm::base::os_reserved_memory: 512
-profile::slurm::controller::autoscale_version: '0.6.1'
+profile::slurm::controller::autoscale_version: '0.7.0'
 profile::slurm::node::enable_tmpfs_mounts: true
 
 profile::accounts::project_regex: '(ctb|def|rpp|rrg)-[a-z0-9_-]*'
-profile::users::ldap::access_tags: ['login:sshd', 'node:sshd', 'proxy:jupyterhub-login']
 profile::users::ldap::users:
   'user':
     count: "%{alias('terraform.data.nb_users')}"
     passwd: "%{alias('terraform.data.guest_passwd')}"
-    groups: ['def-sponsor00']
     manage_password: true
+
+profile::users::ldap::groups:
+  'def-sponsor00':
+    automember: true
+    hbac_rules: ['login:sshd', 'node:sshd', 'proxy:jupyterhub-login']
 
 profile::users::local::users:
   "%{alias('terraform.data.sudoer_username')}":
@@ -316,6 +321,9 @@ profile::consul::servers: "%{alias('terraform.tag_ip.puppet')}"
 profile::nfs::domain: "%{lookup('profile::freeipa::base::ipa_domain')}"
 profile::nfs::client::server_ip: "%{alias('terraform.tag_ip.nfs.0')}"
 profile::volumes::devices: "%{alias('terraform.self.volumes')}"
+
+profile::mail::base::origin: "%{alias('terraform.data.domain_name')}"
+profile::mail::sender::relayhosts: "%{alias('terraform.tag_ip.public')}"
 
 profile::reverse_proxy::domain_name: "%{alias('terraform.data.domain_name')}"
 profile::reverse_proxy::subdomains:
