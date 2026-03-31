@@ -351,6 +351,7 @@ metrix::db_ip: 127.0.0.1
 metrix::db_port: 3306
 metrix::install::version: 1.6.0
 metrix::subdomain: 'metrix'
+metrix::logins: []
 
 metrix::slurm_jobscripts::api_url: "http://%{lookup('terraform.tag_ip.mgmt.0')}:9000"
 metrix::slurm_jobscripts::token: "%{alias('metrix::root_api_token')}"

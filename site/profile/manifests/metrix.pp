@@ -26,7 +26,7 @@ class profile::metrix {
     slurm_password  => lookup('metrix::slurm_password'),
     cluster_name    => lookup('metrix::cluster_name'),
     subdomain       => lookup('metrix::subdomain'),
-    logins          => $logins,
+    logins          => unique(lookup('metrix::logins') + $logins),
     base_dn         => $base_dn,
     domain_name     => $domain_name,
   }
